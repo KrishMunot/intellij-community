@@ -990,4 +990,12 @@ public class GenericsHighlighting8Test extends LightDaemonAnalyzerTestCase {
   public void testUnifiedSubstitutorUpInTheHierarchy() throws Exception {
     doTest();
   }
+
+  public void testNestedCaptures() throws Exception {
+    doTest();
+  }
+
+  public void testErasureOfReturnTypeOfNonGenericMethod() throws Exception {
+    doTest();
+  }
 }

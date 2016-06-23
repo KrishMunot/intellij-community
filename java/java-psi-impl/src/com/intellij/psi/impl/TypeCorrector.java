@@ -182,7 +182,7 @@ class TypeCorrector extends PsiTypeMapper {
     @NotNull
     @Override
     public String getCanonicalText(boolean annotated) {
-      return myDelegate.getCanonicalText();
+      return myDelegate.getCanonicalText(annotated);
     }
 
     @NotNull
@@ -209,13 +209,6 @@ class TypeCorrector extends PsiTypeMapper {
           return mapType(type);
         }
       });
-    }
-
-    @NotNull
-    @Override
-    public PsiCorrectedClassType annotate(@NotNull TypeAnnotationProvider provider) {
-      return provider == getAnnotationProvider() ? this
-                                                 : new PsiCorrectedClassType(myLanguageLevel, myDelegate, myResolveResult, provider);
     }
 
     @Override

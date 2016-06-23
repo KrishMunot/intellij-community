@@ -4,6 +4,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.KeyboardShortcut;
 import com.intellij.openapi.actionSystem.Presentation;
 import com.intellij.openapi.extensions.Extensions;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.keymap.KeymapUtil;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
@@ -23,7 +24,7 @@ public abstract class StudyCheckAction extends StudyActionWithShortcut {
   protected Ref<Boolean> myCheckInProgress = new Ref<>(false);
 
   public StudyCheckAction() {
-    super("Check Task (" + KeymapUtil.getShortcutText(new KeyboardShortcut(KeyStroke.getKeyStroke(SHORTCUT), null)) + ")", "Check current task", InteractiveLearningIcons.Resolve);
+    super("Check Task (" + KeymapUtil.getShortcutText(new KeyboardShortcut(KeyStroke.getKeyStroke(SHORTCUT), null)) + ")", "Check current task", InteractiveLearningIcons.CheckTask);
   }
 
   public abstract void check(@NotNull final Project project);
@@ -38,6 +39,7 @@ public abstract class StudyCheckAction extends StudyActionWithShortcut {
       StudyCheckUtils.showTestResultPopUp("Checking is not available while indexing is in progress", MessageType.WARNING.getPopupBackground(), project);
       return;
     }
+    FileDocumentManager.getInstance().saveAllDocuments();
     for (StudyActionListener listener : Extensions.getExtensions(StudyActionListener.EP_NAME)) {
       listener.beforeCheck(e);
     }

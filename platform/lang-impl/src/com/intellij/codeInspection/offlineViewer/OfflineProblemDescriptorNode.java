@@ -25,6 +25,7 @@ import com.intellij.codeInsight.daemon.impl.DaemonProgressIndicator;
 import com.intellij.codeInsight.daemon.impl.analysis.HighlightingLevelManager;
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.codeInspection.*;
+import com.intellij.codeInspection.ex.InspectionToolWrapper;
 import com.intellij.codeInspection.ex.LocalInspectionToolWrapper;
 import com.intellij.codeInspection.ex.QuickFixWrapper;
 import com.intellij.codeInspection.offline.OfflineProblemDescriptor;
@@ -34,7 +35,7 @@ import com.intellij.codeInspection.ui.InspectionToolPresentation;
 import com.intellij.codeInspection.ui.ProblemDescriptionNode;
 import com.intellij.lang.Language;
 import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.util.Computable;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vcs.FileStatus;
 import com.intellij.psi.*;
 import com.intellij.psi.util.PsiUtilCore;
@@ -49,17 +50,18 @@ import java.util.Set;
 public class OfflineProblemDescriptorNode extends ProblemDescriptionNode {
   OfflineProblemDescriptorNode(RefEntity refEntity,
                                CommonProblemDescriptor descriptor,
-                               @NotNull LocalInspectionToolWrapper toolWrapper,
+                               @NotNull InspectionToolWrapper toolWrapper,
                                @NotNull InspectionToolPresentation presentation,
                                @NotNull OfflineProblemDescriptor offlineDescriptor) {
-    super(refEntity, descriptor, toolWrapper, presentation);
+    super(refEntity, descriptor, toolWrapper, presentation, false, offlineDescriptor::getLine);
     if (descriptor == null) {
       setUserObject(offlineDescriptor);
     }
+    init(presentation.getContext().getProject());
   }
 
   static OfflineProblemDescriptorNode create(@NotNull OfflineProblemDescriptor offlineDescriptor,
-                                             @NotNull LocalInspectionToolWrapper toolWrapper,
+                                             @NotNull InspectionToolWrapper toolWrapper,
                                              @NotNull InspectionToolPresentation presentation) {
     final RefEntity refElement = createRefElement(offlineDescriptor, presentation);
     final CommonProblemDescriptor descriptor = createDescriptor(refElement, offlineDescriptor, toolWrapper, presentation);
@@ -67,13 +69,28 @@ public class OfflineProblemDescriptorNode extends ProblemDescriptionNode {
   }
 
   @Override
-  public boolean calculateIsValid() {
-    return true;
+  public FileStatus getNodeStatus() {
+    return FileStatus.NOT_CHANGED;
+  }
+
+  @NotNull
+  @Override
+  protected String calculatePresentableName() {
+    String presentableName = super.calculatePresentableName();
+    return presentableName.isEmpty() && getUserObject() instanceof OfflineProblemDescriptor
+           ? StringUtil.notNullize(((OfflineProblemDescriptor)getUserObject()).getDescription())
+           : presentableName;
   }
 
   @Override
-  public FileStatus getNodeStatus() {
-    return FileStatus.NOT_CHANGED;
+  protected boolean calculateIsValid() {
+    boolean isValid = super.calculateIsValid();
+    if (!isValid) {
+      if (getDescriptor() == null && !(myToolWrapper instanceof LocalInspectionToolWrapper)) {
+        isValid = myElement != null && myElement.isValid();
+      }
+    }
+    return isValid;
   }
 
   private static PsiElement[] getElementsIntersectingRange(PsiFile file, final int startOffset, final int endOffset) {
@@ -96,20 +113,16 @@ public class OfflineProblemDescriptorNode extends ProblemDescriptionNode {
   @Nullable
   private static CommonProblemDescriptor createDescriptor(@Nullable RefEntity element,
                                                           @NotNull OfflineProblemDescriptor offlineDescriptor,
-                                                          @NotNull LocalInspectionToolWrapper toolWrapper,
+                                                          @NotNull InspectionToolWrapper toolWrapper,
                                                           @NotNull InspectionToolPresentation presentation) {
-
+    if (!(toolWrapper instanceof LocalInspectionToolWrapper)) return null;
     final InspectionManager inspectionManager = InspectionManager.getInstance(presentation.getContext().getProject());
     final OfflineProblemDescriptor offlineProblemDescriptor = offlineDescriptor;
     if (element instanceof RefElement) {
       final PsiElement psiElement = ((RefElement)element).getElement();
       if (psiElement != null) {
-        ProblemDescriptor descriptor = ProgressManager.getInstance().runProcess(new Computable<ProblemDescriptor>() {
-          @Override
-          public ProblemDescriptor compute() {
-            return runLocalTool(psiElement, inspectionManager, offlineProblemDescriptor, toolWrapper);
-          }
-        }, new DaemonProgressIndicator());
+        ProblemDescriptor descriptor = ProgressManager.getInstance().runProcess(
+          () -> runLocalTool(psiElement, inspectionManager, offlineProblemDescriptor, (LocalInspectionToolWrapper)toolWrapper), new DaemonProgressIndicator());
         if (descriptor != null) return descriptor;
       }
       return null;

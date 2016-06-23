@@ -121,8 +121,8 @@ public class PyFunctionImpl extends PyBaseElementImpl<PyFunctionStub> implements
 
   @Override
   public Icon getIcon(int flags) {
-    if (isValid()) {
-      final Property property = getProperty();
+    PyPsiUtils.assertValid(this);
+    final Property property = getProperty();
       if (property != null) {
         if (property.getGetter().valueOrNull() == this) {
           return PythonIcons.Python.PropertyGetter;
@@ -138,7 +138,6 @@ public class PyFunctionImpl extends PyBaseElementImpl<PyFunctionStub> implements
       if (getContainingClass() != null) {
         return PlatformIcons.METHOD_ICON;
       }
-    }
     return PythonIcons.Python.Function;
   }
 
@@ -753,13 +752,9 @@ public class PyFunctionImpl extends PyBaseElementImpl<PyFunctionStub> implements
      * Need to save stubs and use them somehow.
      *
      */
-    return CachedValuesManager.getManager(getProject()).getCachedValue(this, ATTRIBUTES_KEY, new CachedValueProvider<List<PyAssignmentStatement>>() {
-      @Nullable
-      @Override
-      public Result<List<PyAssignmentStatement>> compute() {
-        final List<PyAssignmentStatement> result = findAttributesStatic(PyFunctionImpl.this);
-        return Result.create(result, PsiModificationTracker.MODIFICATION_COUNT);
-      }
+    return CachedValuesManager.getManager(getProject()).getCachedValue(this, ATTRIBUTES_KEY, () -> {
+      final List<PyAssignmentStatement> result = findAttributesStatic(PyFunctionImpl.this);
+      return CachedValueProvider.Result.create(result, PsiModificationTracker.MODIFICATION_COUNT);
     }, false);
   }
 

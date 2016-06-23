@@ -37,7 +37,10 @@ import com.intellij.debugger.ui.breakpoints.BreakpointManager;
 import com.intellij.debugger.ui.breakpoints.RunToCursorBreakpoint;
 import com.intellij.debugger.ui.breakpoints.StepIntoBreakpoint;
 import com.intellij.debugger.ui.tree.ValueDescriptor;
-import com.intellij.debugger.ui.tree.render.*;
+import com.intellij.debugger.ui.tree.render.ArrayRenderer;
+import com.intellij.debugger.ui.tree.render.ClassRenderer;
+import com.intellij.debugger.ui.tree.render.NodeRenderer;
+import com.intellij.debugger.ui.tree.render.PrimitiveRenderer;
 import com.intellij.execution.CantRunException;
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.ExecutionResult;
@@ -123,19 +126,9 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
   // we use null key here
   private final Map<Type, NodeRenderer> myNodeRenderersMap = new HashMap<>();
 
-  private final NodeRendererSettingsListener mySettingsListener = new NodeRendererSettingsListener() {
-    @Override
-    public void renderersChanged() {
-      myNodeRenderersMap.clear();
-      myRenderers.clear();
-      loadRenderers();
-    }
-  };
-
   private final SuspendManagerImpl mySuspendManager = new SuspendManagerImpl(this);
   protected CompoundPositionManager myPositionManager = null;
   private final DebuggerManagerThreadImpl myDebuggerManagerThread;
-  private static final int LOCAL_START_TIMEOUT = 30000;
 
   private final Semaphore myWaitFor = new Semaphore();
   private final AtomicBoolean myIsFailed = new AtomicBoolean(false);
@@ -150,8 +143,8 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
     myProject = project;
     myDebuggerManagerThread = new DebuggerManagerThreadImpl(myDisposable, myProject);
     myRequestManager = new RequestManagerImpl(this);
-    NodeRendererSettings.getInstance().addListener(mySettingsListener);
-    loadRenderers();
+    NodeRendererSettings.getInstance().addListener(this::reloadRenderers, myDisposable);
+    reloadRenderers();
     myDebugProcessDispatcher.addListener(new DebugProcessListener() {
       @Override
       public void paused(SuspendContext suspendContext) {
@@ -161,10 +154,17 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
     });
   }
 
-  private void loadRenderers() {
+  private void reloadRenderers() {
     getManagerThread().invoke(new DebuggerCommandImpl() {
       @Override
+      public Priority getPriority() {
+        return Priority.HIGH;
+      }
+
+      @Override
       protected void action() throws Exception {
+        myNodeRenderersMap.clear();
+        myRenderers.clear();
         try {
           final NodeRendererSettings rendererSettings = NodeRendererSettings.getInstance();
           for (final NodeRenderer renderer : rendererSettings.getAllRenderers()) {
@@ -216,35 +216,23 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
 
   public NodeRenderer getAutoRenderer(ValueDescriptor descriptor) {
     DebuggerManagerThreadImpl.assertIsManagerThread();
-    final Value value = descriptor.getValue();
-    Type type = value != null ? value.type() : null;
+    Type type = descriptor.getType();
 
     // in case evaluation is not possible, force default renderer
     if (!DebuggerManagerEx.getInstanceEx(getProject()).getContext().isEvaluationPossible()) {
       return getDefaultRenderer(type);
     }
 
-    NodeRenderer renderer = myNodeRenderersMap.get(type);
-    if(renderer == null) {
-      for (final NodeRenderer nodeRenderer : myRenderers) {
-        if (nodeRenderer.isApplicable(type)) {
-          renderer = nodeRenderer;
-          break;
-        }
-      }
-      if (renderer == null) {
-        renderer = getDefaultRenderer(type);
-      }
-      myNodeRenderersMap.put(type, renderer);
-    }
-
-    return renderer;
+    return myNodeRenderersMap.computeIfAbsent(type, t ->
+      myRenderers.stream().filter(r -> r.isApplicable(type)).findFirst().orElseGet(() -> getDefaultRenderer(type)));
   }
 
+  @NotNull
   public static NodeRenderer getDefaultRenderer(Value value) {
     return getDefaultRenderer(value != null ? value.type() : null);
   }
 
+  @NotNull
   public static NodeRenderer getDefaultRenderer(Type type) {
     final NodeRendererSettings settings = NodeRendererSettings.getInstance();
 
@@ -876,7 +864,6 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
   }
 
   public void dispose() {
-    NodeRendererSettings.getInstance().removeListener(mySettingsListener);
     Disposer.dispose(myDisposable);
     myRequestManager.setFilterThread(null);
   }
@@ -1851,7 +1838,7 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
           myState.set(State.INITIAL);
           myConnection = environment.getRemoteConnection();
           getManagerThread().restartIfNeeded();
-          createVirtualMachine(environment.getSessionName(), environment.isPollConnection());
+          createVirtualMachine(environment);
         });
       }
     });
@@ -1868,7 +1855,7 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
 
     myConnection = environment.getRemoteConnection();
 
-    createVirtualMachine(environment.getSessionName(), environment.isPollConnection());
+    createVirtualMachine(environment);
 
     ExecutionResult executionResult;
     try {
@@ -1931,7 +1918,9 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
     }
   }
 
-  private void createVirtualMachine(final String sessionName, final boolean pollConnection) {
+  private void createVirtualMachine(final DebugEnvironment environment) {
+    final String sessionName = environment.getSessionName();
+    final long pollTimeout = environment.getPollTimeout();
     final Semaphore semaphore = new Semaphore();
     semaphore.down();
 
@@ -1955,13 +1944,13 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
 
         try {
           final long time = System.currentTimeMillis();
-          while (System.currentTimeMillis() - time < LOCAL_START_TIMEOUT) {
+          do {
             try {
               vm = createVirtualMachineInt();
               break;
             }
             catch (final ExecutionException e) {
-              if (pollConnection && !myConnection.isServerMode() && e.getCause() instanceof IOException) {
+              if (pollTimeout > 0 && !myConnection.isServerMode() && e.getCause() instanceof IOException) {
                 synchronized (this) {
                   try {
                     wait(500);
@@ -1985,6 +1974,7 @@ public abstract class DebugProcessImpl extends UserDataHolderBase implements Deb
               }
             }
           }
+          while (System.currentTimeMillis() - time < pollTimeout);
         }
         finally {
           semaphore.up();

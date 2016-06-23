@@ -27,6 +27,7 @@ import com.intellij.util.NotNullFunction;
 import com.intellij.util.PairConsumer;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.Convertor;
+import com.jetbrains.jsonSchema.JsonSchemaFileTypeManager;
 import com.jetbrains.jsonSchema.JsonSchemaVfsListener;
 import com.jetbrains.jsonSchema.extension.JsonSchemaFileProvider;
 import com.jetbrains.jsonSchema.extension.JsonSchemaImportedProviderMarker;
@@ -205,6 +206,7 @@ public class JsonSchemaServiceImpl implements JsonSchemaServiceEx {
       initialized = false;
       mySchemaFiles.clear();
     }
+    JsonSchemaFileTypeManager.getInstance().reset(myProject);
   }
 
   @Nullable
@@ -282,12 +284,7 @@ public class JsonSchemaServiceImpl implements JsonSchemaServiceEx {
 
     public CompositeCodeInsightProviderWithWarning(List<JsonSchemaObjectCodeInsightWrapper> wrappers) {
       final List<JsonSchemaObjectCodeInsightWrapper> userSchemaWrappers =
-        ContainerUtil.filter(wrappers, new Condition<JsonSchemaObjectCodeInsightWrapper>() {
-          @Override
-          public boolean value(JsonSchemaObjectCodeInsightWrapper wrapper) {
-            return wrapper.isUserSchema();
-          }
-        });
+        ContainerUtil.filter(wrappers, wrapper -> wrapper.isUserSchema());
       // filter for the case when there are one system schema and one (several) user schemas
       // then do not use provided system schema: user schema will override it (maybe the user updated the version himself)
       // if there are 2 or more system schemas - just go the common way: it is unclear what happened and why
@@ -356,5 +353,13 @@ public class JsonSchemaServiceImpl implements JsonSchemaServiceEx {
   @Override
   public boolean checkFileForId(@NotNull final String id, @NotNull final VirtualFile file) {
     return myDefinitions.checkFileForId(id, file);
+  }
+
+  @Override
+  public Set<VirtualFile> getSchemaFiles() {
+    if (!initialized) {
+      ensureSchemaFiles(myProject);
+    }
+    return Collections.unmodifiableSet(mySchemaFiles);
   }
 }

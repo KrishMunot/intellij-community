@@ -73,7 +73,7 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
   private static final Collection<ProgressIndicator> nonStandardIndicators = ConcurrentHashMultiset.create();
 
   public CoreProgressManager() {
-    HeavyProcessLatch.INSTANCE.addUIActivityListener(this, new HeavyProcessLatch.HeavyProcessListener() {
+    HeavyProcessLatch.INSTANCE.addUIActivityListener(new HeavyProcessLatch.HeavyProcessListener() {
       @Override
       public void processStarted() {
         updateShouldCheckCanceled();
@@ -84,7 +84,7 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
         updateShouldCheckCanceled();
       }
 
-    });
+    }, this);
   }
 
   @NotNull
@@ -301,8 +301,12 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
   @Override
   public void run(@NotNull final Task task) {
     if (task.isHeadless()) {
-      ApplicationManager.getApplication().assertIsDispatchThread();
-      runProcessWithProgressSynchronously(task, null);
+      if (ApplicationManager.getApplication().isDispatchThread()) {
+        runProcessWithProgressSynchronously(task, null);
+      }
+      else {
+        new TaskRunnable(task, new EmptyProgressIndicator()).run();
+      }
     }
     else if (task.isModal()) {
       runProcessWithProgressSynchronously(task.asModal(), null);

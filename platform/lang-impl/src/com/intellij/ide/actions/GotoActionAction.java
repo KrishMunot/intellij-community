@@ -234,12 +234,12 @@ public class GotoActionAction extends GotoActionBase implements DumbAware {
 
   public static void openOptionOrPerformAction(@NotNull Object element,
                                                final String enteredText,
-                                               final Project project,
+                                               @Nullable final Project project,
                                                Component component,
                                                @Nullable AnActionEvent e) {
     if (element instanceof OptionDescription) {
       final String configurableId = ((OptionDescription)element).getConfigurableId();
-      TransactionGuard.submitTransaction(project, () ->
+      TransactionGuard.getInstance().submitTransactionLater(project != null ? project : ApplicationManager.getApplication(), () ->
         ShowSettingsUtilImpl.showSettingsDialog(project, configurableId, enteredText));
     }
     else {
@@ -251,7 +251,7 @@ public class GotoActionAction extends GotoActionBase implements DumbAware {
     // element could be AnAction (SearchEverywhere)
     if (component == null) return;
     final AnAction action = element instanceof AnAction ? (AnAction)element : ((GotoActionModel.ActionWrapper)element).getAction();
-    TransactionGuard.submitTransaction(ApplicationManager.getApplication(), () -> {
+    TransactionGuard.getInstance().submitTransactionLater(ApplicationManager.getApplication(), () -> {
         DataManager instance = DataManager.getInstance();
         DataContext context = instance != null ? instance.getDataContext(component) : DataContext.EMPTY_CONTEXT;
         InputEvent inputEvent = e == null ? null : e.getInputEvent();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2015 JetBrains s.r.o.
+ * Copyright 2000-2016 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -162,7 +162,10 @@ public class ActionButton extends JComponent implements ActionButtonComponent, A
   }
 
   private void actionPerformed(final AnActionEvent event) {
-    if (myAction instanceof ActionGroup && !(myAction instanceof CustomComponentAction) && ((ActionGroup)myAction).isPopup()) {
+    if (myAction instanceof ActionGroup &&
+        !(myAction instanceof CustomComponentAction) &&
+        ((ActionGroup)myAction).isPopup() &&
+        !((ActionGroup)myAction).canBePerformed(event.getDataContext())) {
       final ActionManagerImpl am = (ActionManagerImpl)ActionManager.getInstance();
       ActionPopupMenuImpl popupMenu = (ActionPopupMenuImpl)am.createActionPopupMenu(event.getPlace(), (ActionGroup)myAction, new MenuItemPresentationFactory() {
         @Override
@@ -173,12 +176,7 @@ public class ActionButton extends JComponent implements ActionButtonComponent, A
           }
         }
       });
-      popupMenu.setDataContextProvider(new Getter<DataContext>() {
-        @Override
-        public DataContext get() {
-          return ActionButton.this.getDataContext();
-        }
-      });
+      popupMenu.setDataContextProvider(() -> ActionButton.this.getDataContext());
       if (ActionPlaces.isToolbarPlace(event.getPlace())) {
         popupMenu.getComponent().show(this, 0, getHeight());
       }

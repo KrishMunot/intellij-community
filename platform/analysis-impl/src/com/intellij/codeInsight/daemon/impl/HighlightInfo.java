@@ -16,6 +16,7 @@
 
 package com.intellij.codeInsight.daemon.impl;
 
+import com.intellij.codeHighlighting.RainbowHighlighter;
 import com.intellij.codeInsight.daemon.GutterMark;
 import com.intellij.codeInsight.daemon.HighlightDisplayKey;
 import com.intellij.codeInsight.intention.IntentionAction;
@@ -29,6 +30,7 @@ import com.intellij.lang.annotation.Annotation;
 import com.intellij.lang.annotation.HighlightSeverity;
 import com.intellij.lang.annotation.ProblemGroup;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.editor.DefaultLanguageHighlighterColors;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.HighlighterColors;
 import com.intellij.openapi.editor.RangeMarker;
@@ -43,7 +45,6 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.ArrayUtilRt;
 import com.intellij.util.BitUtil;
-import com.intellij.util.Function;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.xml.util.XmlStringUtil;
 import org.intellij.lang.annotations.MagicConstant;
@@ -177,7 +178,24 @@ public class HighlightInfo implements Segment {
       return colorsScheme.getAttributes(forcedTextAttributesKey);
     }
 
-    return getAttributesByType(element, type, colorsScheme);
+    TextAttributes attributes = getAttributesByType(element, type, colorsScheme);
+    if (element != null &&
+        RainbowHighlighter.isRainbowEnabled() &&
+        !RainbowHighlighter.isByPassLanguage(element.getLanguage()) &&
+        isLikeVariable(type.getAttributesKey())) {
+      String text = element.getContainingFile().getText();
+      String name = text.substring(startOffset, endOffset);
+      attributes = new RainbowHighlighter(colorsScheme).getAttributes(name, attributes);
+    }
+    return attributes;
+  }
+
+  private static boolean isLikeVariable(TextAttributesKey key) {
+    if (key == null) return false;
+    TextAttributesKey fallbackAttributeKey = key.getFallbackAttributeKey();
+    if (fallbackAttributeKey == null) return false;
+    if (fallbackAttributeKey == DefaultLanguageHighlighterColors.LOCAL_VARIABLE || fallbackAttributeKey == DefaultLanguageHighlighterColors.PARAMETER) return true;
+    return isLikeVariable(fallbackAttributeKey);
   }
 
   public static TextAttributes getAttributesByType(@Nullable final PsiElement element,
@@ -335,10 +353,6 @@ public class HighlightInfo implements Segment {
   @Override
   @NonNls
   public String toString() {
-    return getDescription() != null ? getDescription() : "";
-  }
-
-  public String paramString() {
     @NonNls String s = "HighlightInfo(" + startOffset + "," + endOffset+")";
     if (getActualStartOffset() != startOffset || getActualEndOffset() != endOffset) {
       s += "; actual: (" + getActualStartOffset() + "," + getActualEndOffset() + ")";
@@ -799,16 +813,16 @@ public class HighlightInfo implements Segment {
         InspectionProfileEntry wrappedTool = toolWrapper instanceof LocalInspectionToolWrapper ? ((LocalInspectionToolWrapper)toolWrapper).getTool()
                                                                                                : ((GlobalInspectionToolWrapper)toolWrapper).getTool();
         if (wrappedTool instanceof DefaultHighlightVisitorBasedInspection.AnnotatorBasedInspection) {
-          List<IntentionAction> actions = Collections.<IntentionAction>emptyList(); 
+          List<IntentionAction> actions = Collections.emptyList();
           if (myProblemGroup instanceof SuppressableProblemGroup) {
-            actions = Arrays.<IntentionAction>asList(((SuppressableProblemGroup)myProblemGroup).getSuppressActions(element));
+            actions = Arrays.asList(((SuppressableProblemGroup)myProblemGroup).getSuppressActions(element));
           }
           if (fixAllIntention != null) {
             if (actions.isEmpty()) {
-              return Collections.<IntentionAction>singletonList(fixAllIntention);
+              return Collections.singletonList(fixAllIntention);
             }
             else {
-              actions = new ArrayList<IntentionAction>(actions);
+              actions = new ArrayList<>(actions);
               actions.add(fixAllIntention);
             }
           }
@@ -824,7 +838,7 @@ public class HighlightInfo implements Segment {
         else {
           SuppressQuickFix[] suppressFixes = wrappedTool.getBatchSuppressActions(element);
           if (suppressFixes.length > 0) {
-            ContainerUtil.addAll(newOptions, ContainerUtil.map(suppressFixes, (Function<SuppressQuickFix, IntentionAction>)fix -> SuppressIntentionActionFromFix.convertBatchToSuppressIntentionAction(fix)));
+            ContainerUtil.addAll(newOptions, ContainerUtil.map(suppressFixes, SuppressIntentionActionFromFix::convertBatchToSuppressIntentionAction));
           }
         }
 

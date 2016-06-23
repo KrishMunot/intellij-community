@@ -328,7 +328,6 @@ public class PsiDocumentManagerImplTest extends PlatformTestCase {
       WriteCommandAction.runWriteCommandAction(null, () -> document.deleteString(0, "/**/".length()));
       waitTenSecondsForCommit(document);
       assertTrue("Still not committed: " + document, getPsiDocumentManager().isCommitted(document));
-      //System.out.println("i = " + i);
     }
   }
 
@@ -629,7 +628,6 @@ public class PsiDocumentManagerImplTest extends PlatformTestCase {
 
       waitTenSecondsForCommit(document);
       assertTrue("Still not committed: " + document, getPsiDocumentManager().isCommitted(document));
-      System.out.println("i = " + i);
     }
   }
 
@@ -669,6 +667,24 @@ public class PsiDocumentManagerImplTest extends PlatformTestCase {
     PsiDocumentManager.getInstance(myProject).performWhenAllCommitted(() -> assertEquals(document.getText(), copy.getText()));
     DocumentCommitThread.getInstance().waitForAllCommits();
     assertTrue(PsiDocumentManager.getInstance(myProject).isCommitted(document));
+  }
+
+  @SuppressWarnings("ConstantConditions")
+  public void testPerformLaterWhenAllCommittedFromCommitHandler() throws Exception {
+    PsiFile file = getPsiManager().findFile(getVirtualFile(createTempFile("X.txt", "")));
+    Document document = file.getViewProvider().getDocument();
+
+    PsiDocumentManager pdm = PsiDocumentManager.getInstance(myProject);
+    WriteCommandAction.runWriteCommandAction(null, () -> document.insertString(0, "a"));
+    pdm.performWhenAllCommitted(
+      () -> pdm.performLaterWhenAllCommitted(
+        () -> WriteCommandAction.runWriteCommandAction(null, () -> document.insertString(1, "b"))));
+
+    assertTrue(pdm.hasUncommitedDocuments());
+    assertEquals("a", document.getText());
+
+    DocumentCommitThread.getInstance().waitForAllCommits();
+    assertEquals("ab", document.getText());
   }
 
 }

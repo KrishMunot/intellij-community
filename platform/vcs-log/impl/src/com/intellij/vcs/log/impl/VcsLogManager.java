@@ -206,24 +206,27 @@ public class VcsLogManager implements Disposable {
 
     @Override
     public void consume(@NotNull final Exception e) {
-      ApplicationManager.getApplication().invokeLater(new Runnable() {
-        @Override
-        public void run() {
-          if (!myIsBroken) {
-            myIsBroken = true;
-            processErrorFirstTime(e);
-          }
-          else {
-            LOG.debug(e);
-          }
+      ApplicationManager.getApplication().invokeLater(() -> {
+        if (!myIsBroken) {
+          myIsBroken = true;
+          processErrorFirstTime(e);
+        }
+        else {
+          LOG.debug(e);
         }
       });
     }
 
     protected void processErrorFirstTime(@NotNull Exception e) {
       if (myRecreateMainLogHandler != null) {
-        LOG.info(e);
-        VcsBalloonProblemNotifier.showOverChangesView(myProject, "Fatal error, VCS Log recreated: " + e.getMessage(), MessageType.ERROR);
+        String message = "Fatal error, VCS Log recreated: " + e.getMessage();
+        if (isLogVisible()) {
+          LOG.info(e);
+          VcsBalloonProblemNotifier.showOverChangesView(myProject, message, MessageType.ERROR);
+        }
+        else {
+          LOG.error(message, e);
+        }
         myRecreateMainLogHandler.run();
       }
       else {

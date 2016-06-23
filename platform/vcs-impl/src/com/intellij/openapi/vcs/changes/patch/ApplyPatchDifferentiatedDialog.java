@@ -56,10 +56,7 @@ import com.intellij.openapi.vcs.changes.actions.diff.ChangeGoToChangePopupAction
 import com.intellij.openapi.vcs.changes.shelf.ShelvedBinaryFilePatch;
 import com.intellij.openapi.vcs.changes.ui.*;
 import com.intellij.openapi.vfs.*;
-import com.intellij.ui.DocumentAdapter;
-import com.intellij.ui.SimpleColoredComponent;
-import com.intellij.ui.SimpleTextAttributes;
-import com.intellij.ui.UI;
+import com.intellij.ui.*;
 import com.intellij.util.Alarm;
 import com.intellij.util.Consumer;
 import com.intellij.util.containers.ContainerUtil;
@@ -354,7 +351,7 @@ public class ApplyPatchDifferentiatedDialog extends DialogWrapper {
       final FilePresentationModel filePresentationModel = myRecentPathFileChange.get();
       final VirtualFile file = filePresentationModel != null ? filePresentationModel.getVf() : null;
       if (file == null) {
-        ApplicationManager.getApplication().invokeLater(myReset, ModalityState.stateForComponent(getRootPane()));
+        ApplicationManager.getApplication().invokeLater(myReset, ModalityState.stateForComponent(myCenterPanel));
         return;
       }
 
@@ -374,7 +371,7 @@ public class ApplyPatchDifferentiatedDialog extends DialogWrapper {
         myReader = patchReader;
         updateTree(true);
         paintBusy(false);
-      }, ModalityState.stateForComponent(getRootPane()));
+      }, ModalityState.stateForComponent(myCenterPanel));
     }
   }
 
@@ -486,7 +483,7 @@ public class ApplyPatchDifferentiatedDialog extends DialogWrapper {
       ++gb.gridy;
       gb.weighty = 1;
       gb.fill = GridBagConstraints.BOTH;
-      myCenterPanel.add(myChangesTreeList, gb);
+      myCenterPanel.add(ScrollPaneFactory.createScrollPane(myChangesTreeList), gb);
 
       ++gb.gridy;
       gb.weighty = 0;

@@ -68,7 +68,6 @@ import com.intellij.openapi.startup.StartupManager;
 import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.EmptyRunnable;
-import com.intellij.openapi.util.ShutDownTracker;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -134,7 +133,6 @@ public abstract class LightPlatformTestCase extends UsefulTestCase implements Da
   private static TestCase ourTestCase;
   public static Thread ourTestThread;
   private static LightProjectDescriptor ourProjectDescriptor;
-  private static boolean ourHaveShutdownHook;
 
   private ThreadTracker myThreadTracker;
 
@@ -239,10 +237,6 @@ public abstract class LightPlatformTestCase extends UsefulTestCase implements Da
 
     ourProject = PlatformTestCase.createProject(projectFile, LIGHT_PROJECT_MARK + buffer);
     ourPathToKeep = projectFile.getPath();
-    if (!ourHaveShutdownHook) {
-      ourHaveShutdownHook = true;
-      registerShutdownHook();
-    }
     ourPsiManager = null;
 
     ourProjectDescriptor.setUpProject(ourProject, new LightProjectDescriptor.SetupHandler() {
@@ -273,7 +267,7 @@ public abstract class LightPlatformTestCase extends UsefulTestCase implements Da
   @Override
   protected void setUp() throws Exception {
     EdtTestUtil.runInEdtAndWait((ThrowableRunnable<Throwable>)() -> {
-      LightPlatformTestCase.super.setUp();
+      super.setUp();
       initApplication();
       ApplicationInfoImpl.setInPerformanceTest(isPerformanceTest());
 
@@ -413,27 +407,23 @@ public abstract class LightPlatformTestCase extends UsefulTestCase implements Da
   protected void tearDown() throws Exception {
     Project project = getProject();
     CodeStyleSettingsManager.getInstance(project).dropTemporarySettings();
-    List<Throwable> errors = new SmartList<>();
+    List<Throwable> errors = ContainerUtil.newSmartList();
+    Function<ThrowableRunnable<?>, ?> runSafe = c -> {
+      try {
+        c.run();
+      }
+      catch (Throwable e) {
+        errors.add(e);
+      }
+      return true;
+    };
     try {
-      checkForSettingsDamage(errors);
-      doTearDown(project, ourApplication, true, errors);
-    }
-    catch (Throwable e) {
-      errors.add(e);
-    }
-
-    try {
-      //noinspection SuperTearDownInFinally
-      super.tearDown();
-    }
-    catch (Throwable e) {
-      errors.add(e);
-    }
-
-    try {
-      myThreadTracker.checkLeak();
-      InjectedLanguageManagerImpl.checkInjectorsAreDisposed(project);
-      ((VirtualFilePointerManagerImpl)VirtualFilePointerManager.getInstance()).assertPointersAreDisposed();
+      runSafe.fun(() -> checkForSettingsDamage(errors));
+      runSafe.fun(() -> doTearDown(project, ourApplication, true, errors));
+      runSafe.fun(super::tearDown);
+      runSafe.fun(() -> myThreadTracker.checkLeak());
+      runSafe.fun(() -> InjectedLanguageManagerImpl.checkInjectorsAreDisposed(project));
+      runSafe.fun(() -> ((VirtualFilePointerManagerImpl)VirtualFilePointerManager.getInstance()).assertPointersAreDisposed());
     }
     catch (Throwable e) {
       errors.add(e);
@@ -730,13 +720,6 @@ public abstract class LightPlatformTestCase extends UsefulTestCase implements Da
       ourProject = null;
       ourPathToKeep = null;
     }
-  }
-
-  private static void registerShutdownHook() {
-    ShutDownTracker.getInstance().registerShutdownTask(
-      () -> ShutDownTracker.invokeAndWait(true, true,
-                                          () -> ApplicationManager.getApplication().runWriteAction(
-                                            LightPlatformTestCase::closeAndDeleteProject)));
   }
 
   private static class SimpleLightProjectDescriptor extends LightProjectDescriptor {

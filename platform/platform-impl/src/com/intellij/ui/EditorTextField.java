@@ -322,7 +322,8 @@ public class EditorTextField extends NonOpaquePanel implements DocumentListener,
   }
 
   void releaseEditor(@NotNull final Editor editor) {
-    if (myProject != null && myIsViewer) {
+    // todo IMHO this should be removed completely
+    if (myProject != null && !myProject.isDisposed() && myIsViewer) {
       final PsiFile psiFile = PsiDocumentManager.getInstance(myProject).getPsiFile(editor.getDocument());
       if (psiFile != null) {
         DaemonCodeAnalyzer.getInstance(myProject).setHighlightingEnabled(psiFile, true);
@@ -530,26 +531,30 @@ public class EditorTextField extends NonOpaquePanel implements DocumentListener,
       final Container parent = getParent();
       if (parent instanceof JTable || parent instanceof CellRendererPane) return;
 
-      if (UIUtil.isUnderAquaLookAndFeel() || UIUtil.isUnderDarcula() || UIUtil.isUnderIntelliJLaF()) {
-        editor.setBorder(UIUtil.isUnderDarcula() || UIUtil.isUnderIntelliJLaF() ?  new DarculaEditorTextFieldBorder() : new MacUIUtil.EditorTextFieldBorder(this));
-        editor.addFocusListener(new FocusChangeListener() {
-          @Override
-          public void focusGained(Editor editor) {
-            repaint();
-          }
+      setupBorder(editor);
+    }
+  }
 
-          @Override
-          public void focusLost(Editor editor) {
-            repaint();
-          }
-        });
-      }
-      else if (UIUtil.isUnderAlloyLookAndFeel() || UIUtil.isUnderJGoodiesLookAndFeel()) {
-        editor.setBorder(BorderFactory.createCompoundBorder(UIUtil.getTextFieldBorder(), BorderFactory.createEmptyBorder(1, 1, 1, 1)));
-      }
-      else {
-        editor.setBorder(BorderFactory.createCompoundBorder(UIUtil.getTextFieldBorder(), BorderFactory.createEmptyBorder(2, 2, 2, 2)));
-      }
+  protected void setupBorder(@NotNull EditorEx editor) {
+    if (UIUtil.isUnderAquaLookAndFeel() || UIUtil.isUnderDarcula() || UIUtil.isUnderIntelliJLaF()) {
+      editor.setBorder(UIUtil.isUnderDarcula() || UIUtil.isUnderIntelliJLaF() ? new DarculaEditorTextFieldBorder() : new MacUIUtil.EditorTextFieldBorder(this));
+      editor.addFocusListener(new FocusChangeListener() {
+        @Override
+        public void focusGained(Editor editor) {
+          repaint();
+        }
+
+        @Override
+        public void focusLost(Editor editor) {
+          repaint();
+        }
+      });
+    }
+    else if (UIUtil.isUnderAlloyLookAndFeel() || UIUtil.isUnderJGoodiesLookAndFeel()) {
+      editor.setBorder(BorderFactory.createCompoundBorder(UIUtil.getTextFieldBorder(), BorderFactory.createEmptyBorder(1, 1, 1, 1)));
+    }
+    else {
+      editor.setBorder(BorderFactory.createCompoundBorder(UIUtil.getTextFieldBorder(), BorderFactory.createEmptyBorder(2, 2, 2, 2)));
     }
   }
 

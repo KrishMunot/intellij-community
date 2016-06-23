@@ -153,10 +153,7 @@ public final class PsiUtil extends PsiUtilCore {
   }
 
   public static boolean isConstantExpression(@Nullable PsiExpression expression) {
-    if (expression == null) return false;
-    IsConstantExpressionVisitor visitor = new IsConstantExpressionVisitor();
-    expression.accept(visitor);
-    return visitor.myIsConstant;
+    return expression != null && JavaPsiFacade.getInstance(expression.getProject()).isConstantExpression(expression);
   }
 
   // todo: move to PsiThrowsList?
@@ -275,7 +272,14 @@ public final class PsiUtil extends PsiUtilCore {
 
   public static boolean isLocalClass(@NotNull PsiClass psiClass) {
     PsiElement parent = psiClass.getParent();
-    return parent instanceof PsiDeclarationStatement && parent.getParent() instanceof PsiCodeBlock;
+    if (parent instanceof PsiDeclarationStatement && parent.getParent() instanceof PsiCodeBlock) {
+      return true;
+    }
+
+    if (parent instanceof PsiClass) {
+      return isLocalOrAnonymousClass((PsiClass)parent);
+    }
+    return false;
   }
 
   public static boolean isAbstractClass(@NotNull PsiClass clazz) {
@@ -811,10 +815,6 @@ public final class PsiUtil extends PsiUtilCore {
         }
       }
     }
-    else if (type instanceof PsiArrayType) {
-      return captureToplevelWildcards(((PsiArrayType)type).getComponentType(), context).createArrayType();
-    }
-
     return type;
   }
 
@@ -972,7 +972,9 @@ public final class PsiUtil extends PsiUtilCore {
     return element instanceof PsiNamedElement && name.equals(((PsiNamedElement)element).getName());
   }
 
-  public static boolean isRawSubstitutor (@NotNull PsiTypeParameterListOwner owner, @NotNull PsiSubstitutor substitutor) {
+  public static boolean isRawSubstitutor(@NotNull PsiTypeParameterListOwner owner, @NotNull PsiSubstitutor substitutor) {
+    if (substitutor == PsiSubstitutor.EMPTY) return false;
+
     for (PsiTypeParameter parameter : typeParametersIterable(owner)) {
       if (substitutor.substitute(parameter) == null) return true;
     }
@@ -1226,6 +1228,11 @@ public final class PsiUtil extends PsiUtilCore {
     String className = containingClass.getQualifiedName();
     if (className == null) return null;
     return className + "." + member.getName();
+  }
+
+  public static boolean isFromDefaultPackage(PsiClass aClass) {
+    final PsiFile containingFile = aClass.getContainingFile();
+    return containingFile instanceof PsiClassOwner && StringUtil.isEmpty(((PsiClassOwner)containingFile).getPackageName());
   }
 
   static boolean checkSameExpression(PsiElement templateExpr, final PsiExpression expression) {

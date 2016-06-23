@@ -40,7 +40,7 @@ public class IntelliJLaf extends DarculaLaf {
 
   @Override
   protected String getPrefix() {
-    return "intellijlaf";
+    return isWindowsNativeLook() ? "intellijlaf_native" : "intellijlaf";
   }
 
   @Override
@@ -99,6 +99,7 @@ public class IntelliJLaf extends DarculaLaf {
   }
 
   public static boolean isGraphite() {
+    if (!SystemInfo.isMac) return false;
     try {
       // https://developer.apple.com/library/mac/documentation/Cocoa/Reference/ApplicationKit/Classes/NSCell_Class/index.html#//apple_ref/doc/c_ref/NSGraphiteControlTint
       // NSGraphiteControlTint = 6
@@ -114,6 +115,6 @@ public class IntelliJLaf extends DarculaLaf {
   }
 
   public static boolean isWindowsNativeLook() {
-    return Registry.is("ide.intellij.laf.win10.ui");
+    return SystemInfo.isWindows && Registry.is("ide.intellij.laf.win10.ui");
   }
 }

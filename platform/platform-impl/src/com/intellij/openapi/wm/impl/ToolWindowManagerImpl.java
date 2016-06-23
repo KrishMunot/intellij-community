@@ -442,17 +442,14 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
       }
     });
 
-    IdeEventQueue.getInstance().addDispatcher(new IdeEventQueue.EventDispatcher() {
-      @Override
-      public boolean dispatch(AWTEvent e) {
-        if (e instanceof KeyEvent) {
-          dispatchKeyEvent((KeyEvent)e);
-        }
-        if (e instanceof WindowEvent && (e.getID() == WindowEvent.WINDOW_LOST_FOCUS) && e.getSource() == myFrame) {
-          resetHoldState();
-        }
-        return false;
+    IdeEventQueue.getInstance().addDispatcher(e -> {
+      if (e instanceof KeyEvent) {
+        dispatchKeyEvent((KeyEvent)e);
       }
+      if (e instanceof WindowEvent && (e.getID() == WindowEvent.WINDOW_LOST_FOCUS) && e.getSource() == myFrame) {
+        resetHoldState();
+      }
+      return false;
     }, myProject);
   }
 
@@ -498,7 +495,12 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
           if (!myProject.isDisposed()) {
             for (ToolWindowEP bean : checkedSuccessfully) {
               if (getToolWindow(bean.id) == null) {
-                initToolWindow(bean);
+                try {
+                  initToolWindow(bean);
+                }
+                catch (Throwable e) {
+                  LOG.error(String.format("Tool window %s initialization failed", bean.id), e);
+                }
               }
             }
           }

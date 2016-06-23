@@ -16,17 +16,13 @@
 package com.intellij.vcs.log.data;
 
 import com.intellij.openapi.components.PersistentStateComponent;
-import com.intellij.util.Function;
 import com.intellij.util.containers.ContainerUtil;
-import com.intellij.vcs.log.VcsLogSettings;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
 /**
  * Stores UI configuration based on user activity and preferences.
- * Differs from {@link VcsLogSettings} in the fact, that these settings have no representation in the UI settings,
- * and have insignificant effect to the logic of the log, they are just gracefully remember what user prefers to see in the UI.
  */
 public abstract class VcsLogUiPropertiesImpl implements PersistentStateComponent<VcsLogUiPropertiesImpl.State>, VcsLogUiProperties {
   private static final int RECENTLY_FILTERED_VALUES_LIMIT = 10;
@@ -96,12 +92,7 @@ public abstract class VcsLogUiPropertiesImpl implements PersistentStateComponent
 
   @NotNull
   private static List<List<String>> getRecentGroup(Deque<UserGroup> stateField) {
-    return ContainerUtil.map2List(stateField, new Function<UserGroup, List<String>>() {
-      @Override
-      public List<String> fun(UserGroup group) {
-        return group.users;
-      }
-    });
+    return ContainerUtil.map2List(stateField, group -> group.users);
   }
 
   @Override

@@ -308,13 +308,7 @@ public class ResolveUtil {
     if (type instanceof PsiEllipsisType) {
       type = ((PsiEllipsisType)type).toArrayType();
     }
-    for (PsiScopeProcessor each : GroovyResolverProcessor.allProcessors(processor)) {
-      if (!NonCodeMembersContributor.runContributors(type, each, place, state)) {
-        return false;
-      }
-    }
-
-    return true;
+    return NonCodeMembersContributor.runContributors(type, processor, place, state);
   }
 
   private static final Key<PsiType> COMPARABLE = Key.create(CommonClassNames.JAVA_LANG_COMPARABLE);
@@ -358,12 +352,9 @@ public class ResolveUtil {
 
   public static Set<String> getAllSuperTypes(@NotNull PsiType base, final Project project) {
     final Map<String, Set<String>> cache =
-      CachedValuesManager.getManager(project).getCachedValue(project, new CachedValueProvider<Map<String, Set<String>>>() {
-        @Override
-        public Result<Map<String, Set<String>>> compute() {
-          final Map<String, Set<String>> result = ContainerUtil.newConcurrentMap();
-          return Result.create(result, PsiModificationTracker.JAVA_STRUCTURE_MODIFICATION_COUNT);
-        }
+      CachedValuesManager.getManager(project).getCachedValue(project, () -> {
+        final Map<String, Set<String>> result = ContainerUtil.newConcurrentMap();
+        return CachedValueProvider.Result.create(result, PsiModificationTracker.JAVA_STRUCTURE_MODIFICATION_COUNT);
       });
 
     final PsiClass cls = PsiUtil.resolveClassInType(base);
@@ -926,19 +917,6 @@ public class ResolveUtil {
     final PsiElement element = result.getElement();
     if (element instanceof PsiClass && ((PsiClass)element).isAnnotationType()) return (PsiClass)element;
     return null;
-  }
-
-  @NotNull
-  public static String inferExpectedPackageName(PsiElement place) {
-    PsiFile file = place.getContainingFile();
-    PsiDirectory psiDirectory = file.getContainingDirectory();
-    if (psiDirectory != null && file instanceof GroovyFile) {
-      PsiPackage aPackage = JavaDirectoryService.getInstance().getPackage(psiDirectory);
-      if (aPackage != null) {
-        return aPackage.getQualifiedName();
-      }
-    }
-    return "";
   }
 
   public static PsiNamedElement findDuplicate(@NotNull GrVariable variable) {

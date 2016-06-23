@@ -52,6 +52,7 @@ public abstract class BaseOutputReader extends BaseDataReader {
   private final Options myOptions;
   private final char[] myInputBuffer = new char[8192];
   private final StringBuilder myLineBuffer = new StringBuilder();
+  private boolean myCarry;
 
   public BaseOutputReader(@NotNull InputStream inputStream, @Nullable Charset charset) {
     this(createInputStreamReader(inputStream, charset));
@@ -92,6 +93,7 @@ public abstract class BaseOutputReader extends BaseDataReader {
    * @return true if non-zero amount of data has been read
    * @throws IOException If an I/O error occurs
    */
+  @Override
   protected final boolean readAvailableNonBlocking() throws IOException {
     boolean read = false;
 
@@ -105,6 +107,10 @@ public abstract class BaseOutputReader extends BaseDataReader {
       }
     }
     finally {
+      if (myCarry) {
+        myLineBuffer.append('\r');
+        myCarry = false;
+      }
       if (myLineBuffer.length() > 0) {
         sendText(myLineBuffer);
       }
@@ -122,6 +128,7 @@ public abstract class BaseOutputReader extends BaseDataReader {
    * @return true if non-zero amount of data has been read, false if end of the stream is reached
    * @throws IOException If an I/O error occurs
    */
+  @Override
   protected final boolean readAvailableBlocking() throws IOException {
     boolean read = false;
 
@@ -132,12 +139,13 @@ public abstract class BaseOutputReader extends BaseDataReader {
           read = true;
           processInput(myInputBuffer, myLineBuffer, n);
         }
-        if (!myReader.ready()) {
-          onBufferExhaustion();
-        }
       }
     }
     finally {
+      if (myCarry) {
+        myLineBuffer.append('\r');
+        myCarry = false;
+      }
       if (myLineBuffer.length() > 0) {
         sendText(myLineBuffer);
       }
@@ -146,13 +154,28 @@ public abstract class BaseOutputReader extends BaseDataReader {
     return read;
   }
 
+  @SuppressWarnings("AssignmentToForLoopParameter")
   private void processInput(char[] buffer, StringBuilder line, int n) {
     if (myOptions.splitToLines()) {
       for (int i = 0; i < n; i++) {
-        char c = buffer[i];
+        char c;
+        if (i == 0 && myCarry) {
+          c = '\r';
+          i--;
+          myCarry = false;
+        }
+        else {
+          c = buffer[i];
+        }
 
-        if (c == '\r' && i + 1 < n && buffer[i + 1] == '\n') {
-          continue;
+        if (c == '\r') {
+          if (i + 1 == n) {
+            myCarry = true;
+            continue;
+          }
+          else if (buffer[i + 1] == '\n') {
+            continue;
+          }
         }
 
         if (c != '\n' || myOptions.sendIncompleteLines() || myOptions.withSeparators()) {
@@ -183,18 +206,20 @@ public abstract class BaseOutputReader extends BaseDataReader {
     myReader.close();
   }
 
-  protected void onBufferExhaustion() { }
+  /** @deprecated use {@link #BaseOutputReader(Reader, Options)} (to be removed in IDEA 2018.1) */
+  protected void onBufferExhaustion() {
+  }
 
   protected abstract void onTextAvailable(@NotNull String text);
 
   //<editor-fold desc="Deprecated stuff.">
-  /** @deprecated use {@link #BaseOutputReader(InputStream, Charset, Options)} (to be removed in IDEA 18) */
+  /** @deprecated use {@link #BaseOutputReader(InputStream, Charset, Options)} (to be removed in IDEA 2018.1) */
   @SuppressWarnings("unused")
   public BaseOutputReader(@NotNull InputStream inputStream, @Nullable Charset charset, @Nullable SleepingPolicy policy) {
     this(inputStream, charset, Options.withPolicy(policy));
   }
 
-  /** @deprecated use {@link #BaseOutputReader(Reader, Options)} (to be removed in IDEA 18) */
+  /** @deprecated use {@link #BaseOutputReader(Reader, Options)} (to be removed in IDEA 2018.1) */
   @SuppressWarnings("unused")
   public BaseOutputReader(@NotNull Reader reader, @Nullable SleepingPolicy policy) {
     this(reader, Options.withPolicy(policy));

@@ -153,6 +153,7 @@ public class UsageViewImpl implements UsageView, UsageModelTracker.UsageModelTra
   // to speed up the expanding (see getExpandedDescendants() here and UsageViewTreeCellRenderer.customizeCellRenderer())
   private boolean expandingAll;
   private final UsageViewTreeCellRenderer myUsageViewTreeCellRenderer;
+  private Usage myOriginUsage;
 
   UsageViewImpl(@NotNull final Project project,
                 @NotNull UsageViewPresentation presentation,
@@ -248,12 +249,7 @@ public class UsageViewImpl implements UsageView, UsageModelTracker.UsageModelTra
     myTransferToEDTQueue = new TransferToEDTQueue<Runnable>("Insert usages", runnable -> {
       runnable.run();
       return true;
-    }, new Condition<Object>() {
-      @Override
-      public boolean value(Object o) {
-        return isDisposed || project.isDisposed();
-      }
-    }, 200);
+    }, o -> isDisposed || project.isDisposed(), 200);
     myExclusionHandler = new ExclusionHandler<Node>() {
       @Override
       public boolean isNodeExcluded(@NotNull Node node) {
@@ -366,12 +362,7 @@ public class UsageViewImpl implements UsageView, UsageModelTracker.UsageModelTra
       };
 
       UsageContextPanel.Provider[] extensions = Extensions.getExtensions(UsageContextPanel.Provider.EP_NAME, myProject);
-      myUsageContextPanelProviders = ContainerUtil.filter(extensions, new Condition<UsageContextPanel.Provider>() {
-        @Override
-        public boolean value(UsageContextPanel.Provider provider) {
-          return provider.isAvailableFor(UsageViewImpl.this);
-        }
-      });
+      myUsageContextPanelProviders = ContainerUtil.filter(extensions, provider -> provider.isAvailableFor(UsageViewImpl.this));
       for (UsageContextPanel.Provider provider : myUsageContextPanelProviders) {
         JComponent component;
         if (myCurrentUsageContextProvider == null || myCurrentUsageContextProvider == provider) {
@@ -875,7 +866,7 @@ public class UsageViewImpl implements UsageView, UsageModelTracker.UsageModelTra
 
         Processor<Usage> processor = usage -> {
           if (searchHasBeenCancelled()) return false;
-          TooManyUsagesStatus.getFrom(indicator).pauseProcessingIfTooManyUsages();
+          tooManyUsagesStatus.pauseProcessingIfTooManyUsages();
 
           boolean incrementCounter = !com.intellij.usages.UsageViewManager.isSelfUsage(usage, myTargets);
 
@@ -1572,7 +1563,6 @@ public class UsageViewImpl implements UsageView, UsageModelTracker.UsageModelTra
         VirtualFile[] data = UsageDataUtil.provideVirtualFileArray(ua, getSelectedUsageTargets());
         sink.put(CommonDataKeys.VIRTUAL_FILE_ARRAY, data);
       }
-
       else if (key == PlatformDataKeys.HELP_ID) {
         sink.put(PlatformDataKeys.HELP_ID, HELP_ID);
       }
@@ -1712,7 +1702,7 @@ public class UsageViewImpl implements UsageView, UsageModelTracker.UsageModelTra
       close();
 
       CommandProcessor.getInstance().executeCommand(
-        myProject, () -> myProcessRunnable.run(),
+        myProject, myProcessRunnable::run,
         myCommandName,
         null
       );
@@ -1734,5 +1724,21 @@ public class UsageViewImpl implements UsageView, UsageModelTracker.UsageModelTra
   @NotNull
   public UsageTarget[] getTargets() {
     return myTargets;
+  }
+
+  /**
+   * The element the "find usages" action was invoked on.
+   * E.g. if the "find usages" was invoked on the reference "getName(2)" pointing to the method "getName()" then the origin usage is this reference.
+   */
+  public void setOriginUsage(@NotNull Usage usage) {
+    myOriginUsage = usage;
+  }
+
+  /** true if the {@param usage} points to the element the "find usages" action was invoked on */
+  public boolean isOriginUsage(@NotNull Usage usage) {
+    return
+      myOriginUsage instanceof UsageInfo2UsageAdapter &&
+      usage instanceof UsageInfo2UsageAdapter &&
+      ((UsageInfo2UsageAdapter)usage).getUsageInfo().equals(((UsageInfo2UsageAdapter)myOriginUsage).getUsageInfo());
   }
 }

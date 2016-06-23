@@ -15,6 +15,7 @@
  */
 package com.intellij.vcs.log.impl;
 
+import com.intellij.ide.PowerSaveMode;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
@@ -22,8 +23,6 @@ import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.vcs.log.VcsLogRefresher;
-import com.intellij.vcs.log.data.DataPack;
-import com.intellij.vcs.log.data.DataPackChangeListener;
 import com.intellij.vcs.log.data.VcsLogData;
 import com.intellij.vcs.log.data.VcsLogFilterer;
 import org.jetbrains.annotations.NotNull;
@@ -39,12 +38,9 @@ public class PostponableLogRefresher implements VcsLogRefresher {
 
   public PostponableLogRefresher(@NotNull VcsLogData logData) {
     myLogData = logData;
-    myLogData.addDataPackChangeListener(new DataPackChangeListener() {
-      @Override
-      public void onDataPackChange(@NotNull DataPack dataPack) {
-        for (VcsLogWindow window : myLogWindows) {
-          dataPackArrived(window.getFilterer(), window.isVisible());
-        }
+    myLogData.addDataPackChangeListener(dataPack -> {
+      for (VcsLogWindow window : myLogWindows) {
+        dataPackArrived(window.getFilterer(), window.isVisible());
       }
     });
   }
@@ -53,12 +49,7 @@ public class PostponableLogRefresher implements VcsLogRefresher {
   public Disposable addLogWindow(@NotNull VcsLogWindow window) {
     myLogWindows.add(window);
     filtererActivated(window.getFilterer(), true);
-    return new Disposable() {
-      @Override
-      public void dispose() {
-        myLogWindows.remove(window);
-      }
-    };
+    return () -> myLogWindows.remove(window);
   }
 
   @NotNull
@@ -67,7 +58,7 @@ public class PostponableLogRefresher implements VcsLogRefresher {
   }
 
   public static boolean keepUpToDate() {
-    return Registry.is("vcs.log.keep.up.to.date");
+    return Registry.is("vcs.log.keep.up.to.date") && !PowerSaveMode.isEnabled();
   }
 
   protected boolean canRefreshNow() {
@@ -102,15 +93,12 @@ public class PostponableLogRefresher implements VcsLogRefresher {
   }
 
   public void refresh(@NotNull final VirtualFile root) {
-    ApplicationManager.getApplication().invokeLater(new Runnable() {
-      @Override
-      public void run() {
-        if (canRefreshNow()) {
-          myLogData.refresh(Collections.singleton(root));
-        }
-        else {
-          myRootsToRefresh.add(root);
-        }
+    ApplicationManager.getApplication().invokeLater(() -> {
+      if (canRefreshNow()) {
+        myLogData.refresh(Collections.singleton(root));
+      }
+      else {
+        myRootsToRefresh.add(root);
       }
     }, ModalityState.any());
   }

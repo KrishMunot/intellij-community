@@ -40,7 +40,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.JBPopup;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.util.Computable;
-import com.intellij.openapi.util.Condition;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.text.StringUtil;
@@ -457,6 +456,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable 
   public void finishLookup(char completionChar, @Nullable final LookupElement item) {
     //noinspection deprecation,unchecked
     if (item == null ||
+        !item.isValid() ||
         item instanceof EmptyLookupItem ||
         item.getObject() instanceof DeferredUserLookupValue &&
         item.as(LookupItem.CLASS_CONDITION_KEY) != null &&
@@ -483,12 +483,7 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable 
     }
 
     final String prefix = itemPattern(item);
-    boolean plainMatch = ContainerUtil.or(item.getAllLookupStrings(), new Condition<String>() {
-      @Override
-      public boolean value(String s) {
-        return StringUtil.containsIgnoreCase(s, prefix);
-      }
-    });
+    boolean plainMatch = ContainerUtil.or(item.getAllLookupStrings(), s -> StringUtil.containsIgnoreCase(s, prefix));
     if (!plainMatch) {
       FeatureUsageTracker.getInstance().triggerFeatureUsed(CodeCompletionFeatures.EDITING_COMPLETION_CAMEL_HUMPS);
     }

@@ -93,7 +93,7 @@ public class QuickFixAction extends AnAction implements CustomComponentAction {
     e.getPresentation().setEnabled(false);
 
     final InspectionTree tree = view.getTree();
-    final InspectionToolWrapper toolWrapper = tree.getSelectedToolWrapper();
+    final InspectionToolWrapper toolWrapper = tree.getSelectedToolWrapper(true);
     if (!view.isSingleToolInSelection() || toolWrapper != myToolWrapper) {
       return;
     }
@@ -123,14 +123,14 @@ public class QuickFixAction extends AnAction implements CustomComponentAction {
       if (!ProgressManager.getInstance().runProcessWithProgressSynchronously(() -> ReadAction.run(() -> {
         final ProgressIndicator indicator = ProgressManager.getInstance().getProgressIndicator();
         indicator.setText("Checking problem descriptors...");
-        descriptors.set(tree.getSelectedDescriptors(true, readOnlyFiles));
+        descriptors.set(tree.getSelectedDescriptors(true, readOnlyFiles, false));
       }), InspectionsBundle.message("preparing.for.apply.fix"), true, e.getProject())) {
         return;
       }
       if (isProblemDescriptorsAcceptable() && descriptors.get().length > 0) {
         doApplyFix(view.getProject(), descriptors.get(), readOnlyFiles, tree.getContext());
       } else {
-        doApplyFix(getSelectedElements(e), view);
+        doApplyFix(getSelectedElements(view), view);
       }
     } finally {
       view.setApplyingFix(false);
@@ -222,11 +222,10 @@ public class QuickFixAction extends AnAction implements CustomComponentAction {
     return readOnlyFiles;
   }
 
-  private static RefEntity[] getSelectedElements(AnActionEvent e) {
-    final InspectionResultsView invoker = getInvoker(e);
-    if (invoker == null) return new RefElement[0];
-    List<RefEntity> selection = new ArrayList<>(Arrays.asList(invoker.getTree().getSelectedElements()));
-    PsiDocumentManager.getInstance(invoker.getProject()).commitAllDocuments();
+  private static RefEntity[] getSelectedElements(InspectionResultsView view) {
+    if (view == null) return new RefElement[0];
+    List<RefEntity> selection = new ArrayList<>(Arrays.asList(view.getTree().getSelectedElements()));
+    PsiDocumentManager.getInstance(view.getProject()).commitAllDocuments();
     Collections.sort(selection, (o1, o2) -> {
       if (o1 instanceof RefElement && o2 instanceof RefElement) {
         RefElement r1 = (RefElement)o1;

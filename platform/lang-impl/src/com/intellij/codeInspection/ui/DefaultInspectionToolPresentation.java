@@ -15,6 +15,7 @@
  */
 package com.intellij.codeInspection.ui;
 
+import com.intellij.analysis.AnalysisUIOptions;
 import com.intellij.codeHighlighting.HighlightDisplayLevel;
 import com.intellij.codeInsight.daemon.HighlightDisplayKey;
 import com.intellij.codeInsight.daemon.impl.HighlightInfoType;
@@ -67,14 +68,17 @@ public class DefaultInspectionToolPresentation implements ProblemDescriptionsPro
   private InspectionNode myToolNode;
 
   private static final Object lock = new Object();
-  private final Map<RefEntity, CommonProblemDescriptor[]> myProblemElements = Collections.synchronizedMap(new THashMap<RefEntity, CommonProblemDescriptor[]>(
-    TObjectHashingStrategy.IDENTITY));
+  private final Map<RefEntity, CommonProblemDescriptor[]> myProblemElements = ContainerUtil.newConcurrentMap(TObjectHashingStrategy.IDENTITY);
   private final Map<String, Set<RefEntity>> myContents = Collections.synchronizedMap(new HashMap<String, Set<RefEntity>>(1)); // keys can be null
   private final Set<RefModule> myModulesProblems = Collections.synchronizedSet(new THashSet<RefModule>(TObjectHashingStrategy.IDENTITY));
   private final Map<CommonProblemDescriptor, RefEntity> myProblemToElements = Collections.synchronizedMap(new THashMap<CommonProblemDescriptor, RefEntity>(TObjectHashingStrategy.IDENTITY));
   private DescriptorComposer myComposer;
   private final Map<RefEntity, Set<QuickFix>> myQuickFixActions = Collections.synchronizedMap(new THashMap<RefEntity, Set<QuickFix>>(TObjectHashingStrategy.IDENTITY));
-  private final Map<RefEntity, CommonProblemDescriptor[]> myIgnoredElements = Collections.synchronizedMap(new THashMap<RefEntity, CommonProblemDescriptor[]>(TObjectHashingStrategy.IDENTITY));
+  private final Map<RefEntity, CommonProblemDescriptor[]> myIgnoredElements = Collections.synchronizedMap(new THashMap<RefEntity, CommonProblemDescriptor[]>(TObjectHashingStrategy.IDENTITY) {
+
+
+
+  });
 
   protected static final Logger LOG = Logger.getInstance("#com.intellij.codeInspection.ex.DescriptorProviderInspection");
   private volatile boolean isDisposed;
@@ -82,19 +86,6 @@ public class DefaultInspectionToolPresentation implements ProblemDescriptionsPro
   public DefaultInspectionToolPresentation(@NotNull InspectionToolWrapper toolWrapper, @NotNull GlobalInspectionContextImpl context) {
     myToolWrapper = toolWrapper;
     myContext = context;
-  }
-
-  @NotNull
-  protected static FileStatus calcStatus(boolean old, boolean current) {
-    if (old) {
-      if (!current) {
-        return FileStatus.DELETED;
-      }
-    }
-    else if (current) {
-      return FileStatus.ADDED;
-    }
-    return FileStatus.NOT_CHANGED;
   }
 
   public static String stripUIRefsFromInspectionDescription(String description) {
@@ -228,9 +219,10 @@ public class DefaultInspectionToolPresentation implements ProblemDescriptionsPro
         ApplicationManager.getApplication().assertReadAccessAllowed();
         synchronized (view.getTreeStructureUpdateLock()) {
           final InspectionNode toolNode;
+          final AnalysisUIOptions uiOptions = context.getUIOptions();
           toolNode = myToolNode == null ?
                      view.addTool(myToolWrapper, HighlightDisplayLevel.find(getSeverity((RefElement)refElement)),
-                                  context.getUIOptions().GROUP_BY_SEVERITY, context.isSingleInspectionRun()) : myToolNode;
+                                  uiOptions.GROUP_BY_SEVERITY, view.isSingleInspectionRun()) : myToolNode;
 
           final Map<RefEntity, CommonProblemDescriptor[]> problems = new HashMap<RefEntity, CommonProblemDescriptor[]>();
           problems.put(refElement, descriptors);
@@ -243,9 +235,13 @@ public class DefaultInspectionToolPresentation implements ProblemDescriptionsPro
           }
           content.add(refElement);
 
-          view.getProvider().appendToolNodeContent(context, toolNode,
-                                                   (InspectionTreeNode)toolNode.getParent(), context.getUIOptions().SHOW_STRUCTURE,
-                                                   contents, problems);
+          view.getProvider().appendToolNodeContent(context,
+                                                   toolNode,
+                                                   (InspectionTreeNode)toolNode.getParent(),
+                                                   uiOptions.SHOW_STRUCTURE,
+                                                   true,
+                                                   contents,
+                                                   problems);
 
         }
       }
@@ -362,6 +358,14 @@ public class DefaultInspectionToolPresentation implements ProblemDescriptionsPro
   @Override
   public void amnesty(RefEntity refEntity) {
     getIgnoredElements().remove(refEntity);
+  }
+
+  @Override
+  public void amnesty(RefEntity refEntity, CommonProblemDescriptor descriptor) {
+    final CommonProblemDescriptor[] ignoredDescriptors = getIgnoredElements().get(refEntity);
+    if (ignoredDescriptors != null) {
+      getIgnoredElements().put(refEntity, ArrayUtil.remove(ignoredDescriptors, descriptor));
+    }
   }
 
   @Override
@@ -734,7 +738,8 @@ public class DefaultInspectionToolPresentation implements ProblemDescriptionsPro
   }
 
   @NotNull
-  private Map<RefEntity, CommonProblemDescriptor[]> getIgnoredElements() {
+  @Override
+  public Map<RefEntity, CommonProblemDescriptor[]> getIgnoredElements() {
     return myIgnoredElements;
   }
 
@@ -743,7 +748,8 @@ public class DefaultInspectionToolPresentation implements ProblemDescriptionsPro
   public InspectionNode createToolNode(@NotNull GlobalInspectionContextImpl globalInspectionContext, @NotNull InspectionNode node,
                                        @NotNull InspectionRVContentProvider provider,
                                        @NotNull InspectionTreeNode parentNode,
-                                       boolean showStructure) {
+                                       boolean showStructure,
+                                       boolean groupBySeverity) {
     return node;
   }
 

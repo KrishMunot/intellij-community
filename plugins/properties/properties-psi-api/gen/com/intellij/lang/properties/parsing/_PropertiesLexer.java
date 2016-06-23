@@ -37,21 +37,25 @@ class _PropertiesLexer implements FlexLexer {
 
   /** 
    * Translates characters to character classes
+   * Chosen bits are [9, 6, 6]
+   * Total runtime size is 1568 bytes
    */
-  private static final String ZZ_CMAP_PACKED = 
-    "\11\0\1\3\1\1\1\6\1\5\1\2\22\0\1\11\1\7\1\0"+
-    "\1\7\26\0\1\10\2\0\1\10\36\0\1\4\50\0\1\6\u1fa2\0"+
-    "\1\6\1\6\uffff\0\uffff\0\uffff\0\uffff\0\uffff\0\uffff\0\uffff\0\uffff\0\uffff\0\uffff\0\uffff\0\uffff\0\uffff\0\uffff\0\uffff\0\uffff\0\udfe6\0";
+  public static int ZZ_CMAP(int ch) {
+    return ZZ_CMAP_A[(ZZ_CMAP_Y[ZZ_CMAP_Z[ch>>12]|((ch>>6)&0x3f)]<<6)|(ch&0x3f)];
+  }
 
-  /** 
-   * Translates characters to character classes
-   */
-  private static final int ZZ_SX = 0x0700;
-  private static final int ZZ_MX = 0x10000;
-  private static final int ZZ_LX = 0x110000;
-  private static char [] ZZ_CMAP = zzUnpackCMap(ZZ_CMAP_PACKED, ZZ_SX);
-  private static class M { static final char [] MAP = zzUnpackCMap(ZZ_CMAP_PACKED, ZZ_MX); }
-  private static class L { static final char [] MAP = zzUnpackCMap(ZZ_CMAP_PACKED, ZZ_LX); }
+  /* The ZZ_CMAP_Z table has 272 entries */
+  static final char ZZ_CMAP_Z[] = zzUnpackCMap(
+    "\1\0\1\100\1\200\u010d\100");
+
+  /* The ZZ_CMAP_Y table has 192 entries */
+  static final char ZZ_CMAP_Y[] = zzUnpackCMap(
+    "\1\0\1\1\1\2\175\3\1\4\77\3");
+
+  /* The ZZ_CMAP_A table has 320 entries */
+  static final char ZZ_CMAP_A[] = zzUnpackCMap(
+    "\11\0\1\4\1\2\1\1\1\5\1\3\22\0\1\11\1\7\1\0\1\7\26\0\1\10\2\0\1\10\36\0\1"+
+    "\6\50\0\1\1\242\0\2\1\26\0");
 
   /** 
    * Translates DFA states to action switch labels.
@@ -59,12 +63,12 @@ class _PropertiesLexer implements FlexLexer {
   private static final int [] ZZ_ACTION = zzUnpackAction();
 
   private static final String ZZ_ACTION_PACKED_0 =
-    "\4\0\1\1\1\2\1\3\1\4\1\3\1\5\1\6"+
+    "\4\0\1\1\1\2\1\3\1\4\1\3\2\5\1\6"+
     "\1\5\1\3\1\7\2\2\1\0\1\1\2\4\1\0"+
     "\1\5\1\10\1\11";
 
   private static int [] zzUnpackAction() {
-    int [] result = new int[24];
+    int [] result = new int[25];
     int offset = 0;
     offset = zzUnpackAction(ZZ_ACTION_PACKED_0, offset, result);
     return result;
@@ -90,11 +94,12 @@ class _PropertiesLexer implements FlexLexer {
 
   private static final String ZZ_ROWMAP_PACKED_0 =
     "\0\0\0\12\0\24\0\36\0\50\0\62\0\74\0\106"+
-    "\0\120\0\132\0\144\0\156\0\170\0\120\0\202\0\214"+
-    "\0\74\0\226\0\240\0\252\0\170\0\264\0\276\0\310";
+    "\0\120\0\132\0\144\0\156\0\170\0\202\0\120\0\214"+
+    "\0\226\0\74\0\240\0\252\0\264\0\202\0\276\0\310"+
+    "\0\322";
 
   private static int [] zzUnpackRowMap() {
-    int [] result = new int[24];
+    int [] result = new int[25];
     int offset = 0;
     offset = zzUnpackRowMap(ZZ_ROWMAP_PACKED_0, offset, result);
     return result;
@@ -117,25 +122,24 @@ class _PropertiesLexer implements FlexLexer {
   private static final int [] ZZ_TRANS = zzUnpackTrans();
 
   private static final String ZZ_TRANS_PACKED_0 =
-    "\1\5\3\6\1\7\1\6\1\5\1\10\1\11\1\6"+
-    "\1\12\2\13\1\14\1\15\1\6\3\12\1\14\1\12"+
-    "\2\13\1\6\1\15\1\6\2\12\1\16\1\17\1\12"+
-    "\2\13\1\6\1\15\1\6\3\12\1\20\1\5\3\0"+
-    "\1\21\1\0\2\5\3\0\3\6\1\0\1\6\3\0"+
-    "\1\6\2\5\1\22\2\5\2\0\3\5\1\10\2\0"+
-    "\1\23\1\24\1\23\2\10\2\23\12\0\1\12\2\0"+
-    "\1\12\1\25\1\0\4\12\1\0\3\13\1\0\1\13"+
-    "\3\0\1\13\1\12\2\6\1\14\1\25\1\6\3\12"+
-    "\1\14\2\12\1\26\2\12\2\0\3\12\1\0\2\6"+
-    "\1\27\1\0\1\6\3\0\1\6\1\0\2\6\1\30"+
-    "\1\0\1\6\3\0\1\6\2\5\2\0\1\21\1\0"+
-    "\2\5\2\0\1\23\2\0\7\23\1\10\1\5\1\22"+
-    "\2\10\2\23\3\10\2\12\1\0\1\12\1\25\1\0"+
-    "\4\12\1\0\3\6\1\0\1\6\3\0\1\17\1\0"+
-    "\3\6\1\0\1\6\3\0\1\20";
+    "\2\5\4\6\1\7\1\10\1\11\1\6\1\12\1\13"+
+    "\2\14\1\15\1\14\1\16\2\12\1\15\1\12\1\13"+
+    "\2\14\1\6\1\14\1\16\1\12\1\17\1\20\1\12"+
+    "\1\13\2\14\1\6\1\14\1\16\2\12\1\21\2\5"+
+    "\4\0\1\22\1\5\4\0\4\6\3\0\1\6\3\5"+
+    "\1\23\6\5\2\10\2\0\2\24\1\25\1\10\2\24"+
+    "\12\0\2\12\2\0\1\12\1\0\1\26\5\12\2\14"+
+    "\1\13\1\14\1\26\2\12\1\13\2\0\4\14\3\0"+
+    "\1\14\2\12\2\6\1\15\1\6\1\26\2\12\1\15"+
+    "\3\12\1\27\6\12\2\0\2\6\1\30\1\6\3\0"+
+    "\1\6\2\0\2\6\1\31\1\6\3\0\1\6\3\5"+
+    "\3\0\1\22\1\5\2\0\2\24\2\0\6\24\2\10"+
+    "\1\5\1\23\6\10\3\12\1\0\1\12\1\0\1\26"+
+    "\3\12\2\0\4\6\3\0\1\20\2\0\4\6\3\0"+
+    "\1\21";
 
   private static int [] zzUnpackTrans() {
-    int [] result = new int[210];
+    int [] result = new int[220];
     int offset = 0;
     offset = zzUnpackTrans(ZZ_TRANS_PACKED_0, offset, result);
     return result;
@@ -173,11 +177,11 @@ class _PropertiesLexer implements FlexLexer {
   private static final int [] ZZ_ATTRIBUTE = zzUnpackAttribute();
 
   private static final String ZZ_ATTRIBUTE_PACKED_0 =
-    "\4\0\4\1\1\11\4\1\1\11\2\1\1\0\3\1"+
+    "\4\0\4\1\1\11\5\1\1\11\2\1\1\0\3\1"+
     "\1\0\3\1";
 
   private static int [] zzUnpackAttribute() {
-    int [] result = new int[24];
+    int [] result = new int[25];
     int offset = 0;
     offset = zzUnpackAttribute(ZZ_ATTRIBUTE_PACKED_0, offset, result);
     return result;
@@ -249,14 +253,18 @@ class _PropertiesLexer implements FlexLexer {
    * @param packed   the packed character translation table
    * @return         the unpacked character translation table
    */
-  private static char [] zzUnpackCMap(String packed, int limit) {
-    char [] map = new char[limit];
+  private static char [] zzUnpackCMap(String packed) {
+    int size = 0;
+    for (int i = 0, length = packed.length(); i < length; i += 2) {
+      size += packed.charAt(i);
+    }
+    char[] map = new char[size];
     int i = 0;  /* index in packed string  */
     int j = 0;  /* index in unpacked array */
-    while (i < 78 && j < limit) {
+    while (i < packed.length()) {
       int  count = packed.charAt(i++);
       char value = packed.charAt(i++);
-      do map[j++] = value; while (--count > 0 && j < limit);
+      do map[j++] = value; while (--count > 0);
     }
     return map;
   }
@@ -399,7 +407,6 @@ class _PropertiesLexer implements FlexLexer {
     int zzMarkedPosL;
     int zzEndReadL = zzEndRead;
     CharSequence zzBufferL = zzBuffer;
-    char [] zzCMapL = ZZ_CMAP;
 
     int [] zzTransL = ZZ_TRANS;
     int [] zzRowMapL = ZZ_ROWMAP;
@@ -451,8 +458,7 @@ class _PropertiesLexer implements FlexLexer {
               zzCurrentPosL += Character.charCount(zzInput);
             }
           }
-          if (zzInput >= zzCMapL.length) ZZ_CMAP = zzCMapL = zzInput >= ZZ_MX ? L.MAP : M.MAP;
-          int zzNext = zzTransL[ zzRowMapL[zzState] + zzCMapL[zzInput] ];
+          int zzNext = zzTransL[ zzRowMapL[zzState] + ZZ_CMAP(zzInput) ];
           if (zzNext == -1) break zzForAction;
           zzState = zzNext;
 
